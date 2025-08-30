@@ -23,14 +23,28 @@ func ParseArgs() (*Config, error) {
 
 	flag.Parse()
 
+	// Override with environment variables if available
+	if envURL := os.Getenv("TUDIDI_URL"); envURL != "" {
+		config.URL = envURL
+	}
+	if envEmail := os.Getenv("TUDIDI_USER_EMAIL"); envEmail != "" {
+		config.Email = envEmail
+	}
+	if envPassword := os.Getenv("TUDIDI_USER_PASSWORD"); envPassword != "" {
+		config.Password = envPassword
+	}
+	if envReadonly := os.Getenv("TUDIDI_READONLY"); envReadonly == "true" {
+		config.Readonly = true
+	}
+
 	if config.URL == "" {
-		return nil, fmt.Errorf("URL is required")
+		return nil, fmt.Errorf("URL is required (use --url flag or TUDIDI_URL environment variable)")
 	}
 	if config.Email == "" {
-		return nil, fmt.Errorf("email is required")
+		return nil, fmt.Errorf("email is required (use --email flag or TUDIDI_USER_EMAIL environment variable)")
 	}
 	if config.Password == "" {
-		return nil, fmt.Errorf("password is required")
+		return nil, fmt.Errorf("password is required (use --password flag or TUDIDI_USER_PASSWORD environment variable)")
 	}
 
 	return &config, nil
@@ -38,5 +52,11 @@ func ParseArgs() (*Config, error) {
 
 func PrintUsage() {
 	fmt.Fprintf(os.Stderr, "Usage: %s --url <tudidi-url> --email <user> --password <pass> [--readonly]\n", os.Args[0])
+	fmt.Fprintf(os.Stderr, "\nEnvironment Variables:\n")
+	fmt.Fprintf(os.Stderr, "  TUDIDI_URL          Tudidi server URL\n")
+	fmt.Fprintf(os.Stderr, "  TUDIDI_USER_EMAIL   Email for authentication\n")
+	fmt.Fprintf(os.Stderr, "  TUDIDI_USER_PASSWORD Password for authentication\n")
+	fmt.Fprintf(os.Stderr, "  TUDIDI_READONLY     Set to 'true' for readonly mode\n")
+	fmt.Fprintf(os.Stderr, "\nCommand Line Flags:\n")
 	flag.PrintDefaults()
 }

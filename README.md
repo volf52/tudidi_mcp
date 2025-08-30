@@ -39,6 +39,37 @@ go build -o server
 
 ## Usage
 
+## Usage
+
+### Using Command Line Arguments
+
+```bash
+./server --url <tudidi-server-url> --email <email> --password <password>
+```
+
+### Using Environment Variables
+
+```bash
+export TUDIDI_URL="https://my-tudidi.example.com"
+export TUDIDI_USER_EMAIL="admin@example.com"
+export TUDIDI_USER_PASSWORD="mypassword"
+export TUDIDI_READONLY="true"  # optional, for readonly mode
+
+./server
+```
+
+### Mixed Usage (Environment + CLI)
+
+Environment variables take precedence over CLI flags:
+
+```bash
+export TUDIDI_URL="https://my-tudidi.example.com"
+export TUDIDI_USER_EMAIL="admin@example.com"
+
+# Only need to specify password via CLI if not in environment
+./server --password mypassword --readonly
+```
+
 ### Basic Usage
 
 ```bash
@@ -57,6 +88,15 @@ go build -o server
 - `--email` (required): Email for authentication
 - `--password` (required): Password for authentication  
 - `--readonly` (optional): Enable readonly mode to prevent destructive operations
+
+### Environment Variables
+
+- `TUDIDI_URL`: Tudidi server URL
+- `TUDIDI_USER_EMAIL`: Email for authentication
+- `TUDIDI_USER_PASSWORD`: Password for authentication
+- `TUDIDI_READONLY`: Set to "true" for readonly mode
+
+**Note**: Environment variables take precedence over command line flags.
 
 ### Example
 
@@ -84,6 +124,24 @@ Add to your MCP client configuration:
         "--password", "your-password",
         "--readonly"
       ]
+    }
+  }
+}
+```
+
+Or using environment variables for better security:
+
+```json
+{
+  "mcpServers": {
+    "tudidi": {
+      "command": "/path/to/tudidi_mcp/server",
+      "env": {
+        "TUDIDI_URL": "https://your-tudidi.com",
+        "TUDIDI_USER_EMAIL": "your-email@example.com",
+        "TUDIDI_USER_PASSWORD": "your-password",
+        "TUDIDI_READONLY": "true"
+      }
     }
   }
 }
@@ -155,10 +213,11 @@ The server expects these Tudidi API endpoints:
 
 ## Security
 
-- Credentials are passed via command line arguments (consider environment variables for production)
+- Credentials can be provided via command line arguments or environment variables (environment variables recommended for production)
 - Session cookies are stored in memory only
 - HTTPS is recommended for the Tudidi server URL
 - Readonly mode provides safe operations for untrusted scenarios
+- Environment variables help avoid exposing credentials in process lists
 
 ## License
 
