@@ -9,3 +9,14 @@ run = "go build -o server"
 alias = "ld"
 depends = ["build"]
 run = "cp ./server ~/.local/bin/tudidi_mcp"
+
+[tasks.test]
+alias = "t"
+run = "go test ./..."
+
+[tasks.lint]
+run = "go vet ./..."
+
+[tasks.fmt]
+alias = "f"
+run = "go fmt ./..."

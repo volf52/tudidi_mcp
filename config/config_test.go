@@ -13,12 +13,20 @@ func TestParseArgsValidation(t *testing.T) {
 	// Test that config validation works
 	config := &Config{
 		URL:      "",
-		Username: "",
+		Email:    "",
 		Password: "",
 		Readonly: false,
 	}
 
 	if config.URL != "" {
 		t.Error("Expected empty URL")
+	}
+
+	if config.Email != "" {
+		t.Error("Expected empty email")
+	}
+
+	if config.Password != "" {
+		t.Error("Expected empty password")
 	}
 }

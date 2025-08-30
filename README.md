@@ -4,7 +4,7 @@ A Model Context Protocol (MCP) server for Tudidi task management. This server pr
 
 ## Features
 
-- **Session-based Authentication**: Authenticates with Tudidi server using username/password and maintains session cookies
+- **Session-based Authentication**: Authenticates with Tudidi server using email/password and maintains session cookies
 - **Readonly Mode**: Optional readonly mode prevents destructive operations (create/update/delete)
 - **Complete Task Management**: Full CRUD operations for tasks and lists
 - **MCP Protocol**: Standard MCP server implementation using stdio transport
@@ -42,26 +42,26 @@ go build -o server
 ### Basic Usage
 
 ```bash
-./server --url <tudidi-server-url> --username <username> --password <password>
+./server --url <tudidi-server-url> --email <email> --password <password>
 ```
 
 ### Readonly Mode
 
 ```bash
-./server --url <tudidi-server-url> --username <username> --password <password> --readonly
+./server --url <tudidi-server-url> --email <email> --password <password> --readonly
 ```
 
 ### Command Line Options
 
 - `--url` (required): Tudidi server URL
-- `--username` (required): Username for authentication
+- `--email` (required): Email for authentication
 - `--password` (required): Password for authentication  
 - `--readonly` (optional): Enable readonly mode to prevent destructive operations
 
 ### Example
 
 ```bash
-./server --url https://my-tudidi.example.com --username admin --password mypassword --readonly
+./server --url https://my-tudidi.example.com --email admin@example.com --password mypassword --readonly
 ```
 
 ## MCP Integration
@@ -80,7 +80,7 @@ Add to your MCP client configuration:
       "command": "/path/to/tudidi_mcp/server",
       "args": [
         "--url", "https://your-tudidi.com",
-        "--username", "your-username", 
+        "--email", "your-email@example.com", 
         "--password", "your-password",
         "--readonly"
       ]
