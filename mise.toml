@@ -1,0 +1,11 @@
+[env]
+_.file = ".env"
+
+[tasks.build]
+alias = "b"
+run = "go build -o server"
+
+[tasks.local-deploy]
+alias = "ld"
+depends = ["build"]
+run = "cp ./server ~/.local/bin/tudidi_mcp"
