@@ -5,6 +5,10 @@ _.file = ".env"
 alias = "b"
 run = "go build -o server"
 
+[tasks.build-playground]
+alias = "bp"
+run = "go build -o test-playground ./cmd/test-playground"
+
 [tasks.local-deploy]
 alias = "ld"
 depends = ["build"]
