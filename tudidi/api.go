@@ -90,6 +90,10 @@ func NewAPI(client *auth.Client, readonly bool) *API {
 	}
 }
 
+type GetTasksResponse struct {
+	Tasks []Task `json:"tasks"`
+}
+
 func (api *API) GetTasks() ([]Task, error) {
 	resp, err := api.client.Get("/api/tasks")
 	if err != nil {
@@ -106,12 +110,12 @@ func (api *API) GetTasks() ([]Task, error) {
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
 
-	var tasks []Task
-	if err := json.Unmarshal(body, &tasks); err != nil {
+	var respData GetTasksResponse
+	if err := json.Unmarshal(body, &respData); err != nil {
 		return nil, fmt.Errorf("failed to parse tasks: %w", err)
 	}
 
-	return tasks, nil
+	return respData.Tasks, nil
 }
 
 func (api *API) GetTask(id int) (*Task, error) {

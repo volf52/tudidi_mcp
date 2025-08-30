@@ -218,13 +218,19 @@ Then connect your MCP client to the SSE endpoint at `http://localhost:8080` (or 
 ```
 tudidi_mcp/
 ├── main.go              # Server entry point and initialization
+├── cmd/
+│   └── test-playground/ # Interactive testing tool
+│       ├── main.go      # Test playground implementation
+│       └── README.md    # Playground documentation
 ├── auth/
 │   └── client.go        # HTTP client with authentication
 ├── config/
 │   ├── config.go        # Configuration and CLI parsing
 │   └── config_test.go   # Configuration tests
 ├── tudidi/
-│   └── api.go           # Tudidi API operations
+│   ├── api.go           # Tudidi API operations
+│   ├── api_test.go      # Comprehensive API tests
+│   └── README.md        # API testing documentation
 ├── tools/
 │   └── handlers.go      # MCP tool implementations
 ├── go.mod               # Go module definition
@@ -235,9 +241,13 @@ tudidi_mcp/
 ### Build Commands
 
 ```bash
-# Build
+# Build main server
 mise run build
 # or: go build -o server
+
+# Build test playground
+mise run build-playground
+# or: go build -o test-playground ./cmd/test-playground
 
 # Test
 go test ./...
@@ -248,6 +258,42 @@ go fmt ./...
 # Lint
 go vet ./...
 ```
+
+### Testing & Development Tools
+
+#### Interactive Test Playground
+For manual testing and API exploration:
+
+```bash
+# Build the playground
+mise run build-playground
+
+# Run with your server
+./test-playground --url http://localhost:3002 --email admin@test.com --password secret
+
+# Or use environment variables
+export TUDIDI_URL="http://localhost:3002"
+export TUDIDI_USER_EMAIL="admin@example.com"
+export TUDIDI_USER_PASSWORD="password"
+./test-playground
+```
+
+The playground provides an interactive CLI for testing all API operations. See [`cmd/test-playground/README.md`](cmd/test-playground/README.md) for detailed usage.
+
+#### API Integration Tests
+For automated testing against a live server:
+
+```bash
+# Set test environment variables
+export TUDIDI_TEST_URL="http://localhost:3002"
+export TUDIDI_TEST_EMAIL="test@example.com" 
+export TUDIDI_TEST_PASSWORD="password"
+
+# Run API tests
+go test ./tudidi -v
+```
+
+See [`tudidi/README.md`](tudidi/README.md) for comprehensive testing documentation.
 
 ### Adding New Tools
 

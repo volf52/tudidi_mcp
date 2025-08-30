@@ -24,3 +24,12 @@ run = "go vet ./..."
 [tasks.fmt]
 alias = "f"
 run = "go fmt ./..."
+
+[tasks.build-play]
+alias = "bp"
+run = "go build -o test-playground ./cmd/test-playground/main.go"
+
+[tasks.play]
+depends = ["build-play"]
+run = "./test-playground"
+

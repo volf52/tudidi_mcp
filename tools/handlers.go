@@ -55,7 +55,7 @@ type TaskIDArgs struct {
 type CreateTaskArgs struct {
 	Title       string `json:"title" jsonschema:"Task title"`
 	Description string `json:"description,omitempty" jsonschema:"Task description"`
-	ListID      int    `json:"list_id,omitempty" jsonschema:"List ID to assign task to"`
+	ProjectID   int    `json:"project_id,omitempty" jsonschema:"Project ID where the task will be created"`
 }
 
 type UpdateTaskArgs struct {
@@ -91,16 +91,16 @@ func (h *Handlers) getTask(ctx context.Context, req *mcp.CallToolRequest, args T
 
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
-			&mcp.TextContent{Text: fmt.Sprintf("Task: %s", task.Title)},
+			&mcp.TextContent{Text: fmt.Sprintf("Task: %s", task.Name)},
 		},
 	}, task, nil
 }
 
 func (h *Handlers) createTask(ctx context.Context, req *mcp.CallToolRequest, args CreateTaskArgs) (*mcp.CallToolResult, any, error) {
 	createReq := tudidi.CreateTaskRequest{
-		Title:       args.Title,
-		Description: args.Description,
-		ListID:      args.ListID,
+		Name:      args.Title,
+		Note:      args.Description,
+		ProjectID: args.ProjectID,
 	}
 
 	task, err := h.api.CreateTask(createReq)
@@ -110,7 +110,7 @@ func (h *Handlers) createTask(ctx context.Context, req *mcp.CallToolRequest, arg
 
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
-			&mcp.TextContent{Text: fmt.Sprintf("Created task: %s", task.Title)},
+			&mcp.TextContent{Text: fmt.Sprintf("Created task: %s", task.Name)},
 		},
 	}, task, nil
 }
@@ -129,7 +129,7 @@ func (h *Handlers) updateTask(ctx context.Context, req *mcp.CallToolRequest, arg
 
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
-			&mcp.TextContent{Text: fmt.Sprintf("Updated task: %s", task.Title)},
+			&mcp.TextContent{Text: fmt.Sprintf("Updated task: %s", task.Name)},
 		},
 	}, task, nil
 }
