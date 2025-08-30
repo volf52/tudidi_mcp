@@ -5,9 +5,10 @@ A Model Context Protocol (MCP) server for Tudidi task management. This server pr
 ## Features
 
 - **Session-based Authentication**: Authenticates with Tudidi server using email/password and maintains session cookies
-- **Readonly Mode**: Optional readonly mode prevents destructive operations (create/update/delete)
+- **Readonly Mode**: Optional readonly mode prevents destructive operations (create/update/delete) - defaults to true
+- **Multiple Transports**: Supports both stdio and SSE (Server-Sent Events) transports
 - **Complete Task Management**: Full CRUD operations for tasks and lists
-- **MCP Protocol**: Standard MCP server implementation using stdio transport
+- **MCP Protocol**: Standard MCP server implementation
 
 ## Available Tools
 
@@ -44,7 +45,17 @@ go build -o server
 ### Using Command Line Arguments
 
 ```bash
+# Default transport (stdio) with readonly mode enabled by default
 ./server --url <tudidi-server-url> --email <email> --password <password>
+
+# Disable readonly mode
+./server --url <tudidi-server-url> --email <email> --password <password> --readonly=false
+
+# Use SSE transport on default port (8080)
+./server --url <tudidi-server-url> --email <email> --password <password> --transport sse
+
+# Use SSE transport on custom port
+./server --url <tudidi-server-url> --email <email> --password <password> --transport sse --port 3000
 ```
 
 ### Using Environment Variables
@@ -53,7 +64,9 @@ go build -o server
 export TUDIDI_URL="https://my-tudidi.example.com"
 export TUDIDI_USER_EMAIL="admin@example.com"
 export TUDIDI_USER_PASSWORD="mypassword"
-export TUDIDI_READONLY="true"  # optional, for readonly mode
+export TUDIDI_READONLY="false"  # optional, defaults to true
+export TUDIDI_TRANSPORT="sse"   # optional, defaults to stdio
+export TUDIDI_PORT="3000"       # optional, defaults to 8080 for SSE
 
 ./server
 ```
@@ -67,19 +80,42 @@ export TUDIDI_URL="https://my-tudidi.example.com"
 export TUDIDI_USER_EMAIL="admin@example.com"
 
 # Only need to specify password via CLI if not in environment
-./server --password mypassword --readonly
+./server --password mypassword --readonly=false --transport sse --port 3000
 ```
+
+### Transport Options
+
+#### Stdio Transport (Default)
+```bash
+./server --url <tudidi-server-url> --email <email> --password <password> --transport stdio
+```
+
+#### SSE Transport
+```bash
+# Default port (8080)
+./server --url <tudidi-server-url> --email <email> --password <password> --transport sse
+
+# Custom port
+./server --url <tudidi-server-url> --email <email> --password <password> --transport sse --port 3000
+```
+
+When using SSE transport, the server starts an HTTP server on the specified port (default 8080) and serves MCP over Server-Sent Events.
 
 ### Basic Usage
 
 ```bash
+# Default: readonly=true, transport=stdio
 ./server --url <tudidi-server-url> --email <email> --password <password>
 ```
 
 ### Readonly Mode
 
 ```bash
-./server --url <tudidi-server-url> --email <email> --password <password> --readonly
+# Explicitly enable readonly mode (default)
+./server --url <tudidi-server-url> --email <email> --password <password> --readonly=true
+
+# Disable readonly mode to allow destructive operations
+./server --url <tudidi-server-url> --email <email> --password <password> --readonly=false
 ```
 
 ### Command Line Options
@@ -87,29 +123,43 @@ export TUDIDI_USER_EMAIL="admin@example.com"
 - `--url` (required): Tudidi server URL
 - `--email` (required): Email for authentication
 - `--password` (required): Password for authentication  
-- `--readonly` (optional): Enable readonly mode to prevent destructive operations
+- `--readonly` (optional): Enable/disable readonly mode to prevent destructive operations (default: true)
+- `--transport` (optional): Transport type - 'stdio' or 'sse' (default: stdio)
+- `--port` (optional): Port for SSE transport (default: 8080, ignored for stdio)
 
 ### Environment Variables
 
 - `TUDIDI_URL`: Tudidi server URL
 - `TUDIDI_USER_EMAIL`: Email for authentication
 - `TUDIDI_USER_PASSWORD`: Password for authentication
-- `TUDIDI_READONLY`: Set to "true" for readonly mode
+- `TUDIDI_READONLY`: Set to "true" or "false" for readonly mode (default: true)
+- `TUDIDI_TRANSPORT`: Transport type - 'stdio' or 'sse' (default: stdio)
+- `TUDIDI_PORT`: Port for SSE transport (default: 8080)
 
 **Note**: Environment variables take precedence over command line flags.
 
 ### Example
 
 ```bash
-./server --url https://my-tudidi.example.com --email admin@example.com --password mypassword --readonly
+# Stdio transport with readonly disabled
+./server --url https://my-tudidi.example.com --email admin@example.com --password mypassword --readonly=false
+
+# SSE transport on default port (8080) with readonly enabled (default)
+./server --url https://my-tudidi.example.com --email admin@example.com --password mypassword --transport sse
+
+# SSE transport on custom port
+./server --url https://my-tudidi.example.com --email admin@example.com --password mypassword --transport sse --port 3000
 ```
 
 ## MCP Integration
 
-This server implements the MCP protocol over stdio. It can be integrated with MCP-compatible clients like:
+This server implements the MCP protocol over stdio (default) or SSE transports. It can be integrated with MCP-compatible clients like:
 
-- Claude Desktop
+- Claude Desktop (stdio transport)
+- Web-based MCP clients (SSE transport)
 - Other MCP clients
+
+### Stdio Transport Integration
 
 Add to your MCP client configuration:
 
@@ -122,7 +172,7 @@ Add to your MCP client configuration:
         "--url", "https://your-tudidi.com",
         "--email", "your-email@example.com", 
         "--password", "your-password",
-        "--readonly"
+        "--readonly=false"
       ]
     }
   }
@@ -140,12 +190,26 @@ Or using environment variables for better security:
         "TUDIDI_URL": "https://your-tudidi.com",
         "TUDIDI_USER_EMAIL": "your-email@example.com",
         "TUDIDI_USER_PASSWORD": "your-password",
-        "TUDIDI_READONLY": "true"
+        "TUDIDI_READONLY": "false"
       }
     }
   }
 }
 ```
+
+### SSE Transport Integration
+
+For SSE transport, start the server and connect to the specified port:
+
+```bash
+# Default port 8080
+./server --url https://your-tudidi.com --email your-email@example.com --password your-password --transport sse
+
+# Custom port 3000
+./server --url https://your-tudidi.com --email your-email@example.com --password your-password --transport sse --port 3000
+```
+
+Then connect your MCP client to the SSE endpoint at `http://localhost:8080` (or your specified port).
 
 ## Development
 

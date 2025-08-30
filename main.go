@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"tudidi_mcp/auth"
 	"tudidi_mcp/config"
@@ -52,15 +54,30 @@ func main() {
 	if cfg.Readonly {
 		readonlyStatus = " (readonly mode)"
 	}
-	log.Printf("Tudidi MCP server connected to %s%s", cfg.URL, readonlyStatus)
+	log.Printf("Tudidi MCP server connected to %s%s using %s transport", cfg.URL, readonlyStatus, cfg.Transport)
 
-	// Run the server over stdio
-	transport := &mcp.LoggingTransport{
-		Transport: &mcp.StdioTransport{},
-		Writer:    os.Stderr,
-	}
+	// Run based on transport type
+	switch cfg.Transport {
+	case "stdio":
+		transport := &mcp.LoggingTransport{
+			Transport: &mcp.StdioTransport{},
+			Writer:    os.Stderr,
+		}
+		if err := server.Run(context.Background(), transport); err != nil {
+			log.Fatalf("Server failed: %v", err)
+		}
+	case "sse":
+		// Create SSE handler
+		handler := mcp.NewSSEHandler(func(req *http.Request) *mcp.Server {
+			return server
+		})
 
-	if err := server.Run(context.Background(), transport); err != nil {
-		log.Fatalf("Server failed: %v", err)
+		addr := fmt.Sprintf(":%d", cfg.Port)
+		log.Printf("Starting SSE server on %s", addr)
+		if err := http.ListenAndServe(addr, handler); err != nil {
+			log.Fatalf("SSE server failed: %v", err)
+		}
+	default:
+		log.Fatalf("Unsupported transport: %s", cfg.Transport)
 	}
 }
