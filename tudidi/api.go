@@ -14,28 +14,67 @@ type API struct {
 	readonly bool
 }
 
+type Priority string
+
+const (
+	PriorityLow    Priority = "low"
+	PriorityMedium Priority = "medium"
+	PriorityHigh   Priority = "high"
+)
+
+type Status string
+
+const (
+	NotStarted Status = "not_started"
+	InProgress Status = "in_progress"
+	Completed  Status = "completed"
+)
+
+type Tag struct{}
+
 type Task struct {
-	ID          int    `json:"id"`
-	Title       string `json:"title"`
-	Description string `json:"description,omitempty"`
-	Completed   bool   `json:"completed"`
-	ListID      int    `json:"list_id,omitempty"`
-	CreatedAt   string `json:"created_at,omitempty"`
-	UpdatedAt   string `json:"updated_at,omitempty"`
+	ID           int    `json:"id"`
+	UUID         string `json:"uuid"`
+	Name         string `json:"name"`
+	Note         string `json:"note,omitempty"`
+	DueDate      string `json:"due_date,omitempty"`
+	Today        bool   `json:"today,omitempty"`
+	Priority     int    `json:"priority"`
+	Status       int    `json:"status,omitempty"`
+	ProjectID    int    `json:"project_id,omitempty"`
+	UserID       int    `json:"user_id,omitempty"`
+	CompletedAt  string `json:"completed_at,omitempty"`
+	CreatedAt    string `json:"created_at,omitempty"`
+	UpdatedAt    string `json:"updated_at,omitempty"`
+	Tags         []Tag  `json:"tags"`
+	ParentTaskID int    `json:"parent_task_id,omitempty"`
 }
 
-type TaskList struct {
-	ID          int    `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description,omitempty"`
-	CreatedAt   string `json:"created_at,omitempty"`
-	UpdatedAt   string `json:"updated_at,omitempty"`
+type Project struct {
+	ID                int      `json:"id"`
+	Name              string   `json:"name"`
+	Description       string   `json:"description,omitempty"`
+	Active            bool     `json:"active,omitempty"`
+	PinToSidebar      bool     `json:"pin_to_sidebar,omitempty"`
+	Priority          Priority `json:"priority,omitempty"`
+	DueDateAt         string   `json:"due_date_at,omitempty"`
+	UserID            int      `json:"user_id,omitempty"`
+	AreaID            int      `json:"area_id,omitempty"`
+	TaskShowCompleted bool     `json:"task_show_completed,omitempty"`
+	TaskSortOrder     string   `json:"task_sort_order,omitempty"`
+	CreatedAt         string   `json:"created_at,omitempty"`
+	UpdatedAt         string   `json:"updated_at,omitempty"`
+}
+
+type Projects struct {
+	Projects []Project `json:"projects"`
 }
 
 type CreateTaskRequest struct {
-	Title       string `json:"title"`
-	Description string `json:"description,omitempty"`
-	ListID      int    `json:"list_id,omitempty"`
+	Name      string `json:"name"`
+	Note      string `json:"note,omitempty"`
+	ProjectID int    `json:"project_id"`
+	Status    Status `json:"status"`
 }
 
 type UpdateTaskRequest struct {
@@ -192,7 +231,7 @@ func (api *API) DeleteTask(id int) error {
 	return nil
 }
 
-func (api *API) GetLists() ([]TaskList, error) {
+func (api *API) GetLists() ([]Project, error) {
 	resp, err := api.client.Get("/api/lists")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get lists: %w", err)
@@ -208,7 +247,7 @@ func (api *API) GetLists() ([]TaskList, error) {
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
 
-	var lists []TaskList
+	var lists []Project
 	if err := json.Unmarshal(body, &lists); err != nil {
 		return nil, fmt.Errorf("failed to parse lists: %w", err)
 	}
