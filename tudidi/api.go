@@ -245,10 +245,14 @@ func (api *API) DeleteTask(id int) error {
 	return nil
 }
 
-func (api *API) GetLists() ([]Project, error) {
-	resp, err := api.client.Get("/api/lists")
+type GetProjectsResponse struct {
+	Projects []Project `json:"projects"`
+}
+
+func (api *API) GetProjects() ([]Project, error) {
+	resp, err := api.client.Get("/api/projects")
 	if err != nil {
-		return nil, fmt.Errorf("failed to get lists: %w", err)
+		return nil, fmt.Errorf("failed to get projects: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -261,10 +265,10 @@ func (api *API) GetLists() ([]Project, error) {
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
 
-	var lists []Project
-	if err := json.Unmarshal(body, &lists); err != nil {
-		return nil, fmt.Errorf("failed to parse lists: %w", err)
+	var projectsResponse GetProjectsResponse
+	if err := json.Unmarshal(body, &projectsResponse); err != nil {
+		return nil, fmt.Errorf("failed to parse projects: %w", err)
 	}
 
-	return lists, nil
+	return projectsResponse.Projects, nil
 }

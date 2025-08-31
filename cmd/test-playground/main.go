@@ -252,7 +252,7 @@ func createTask(api *tudidi.API, scanner *bufio.Scanner) {
 		}
 	} else {
 		// Try to get first available project
-		lists, err := api.GetLists()
+		lists, err := api.GetProjects()
 		if err != nil || len(lists) == 0 {
 			fmt.Println("❌ No projects available and no project ID specified")
 			return
@@ -394,7 +394,7 @@ func deleteTask(api *tudidi.API, scanner *bufio.Scanner) {
 
 func listLists(api *tudidi.API) {
 	fmt.Println("📁 Fetching project lists...")
-	lists, err := api.GetLists()
+	lists, err := api.GetProjects()
 	if err != nil {
 		fmt.Printf("❌ Error fetching lists: %v\n", err)
 		return
