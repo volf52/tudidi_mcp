@@ -298,7 +298,7 @@ func updateTask(api *tudidi.API, scanner *bufio.Scanner) {
 	if !scanner.Scan() {
 		return
 	}
-	title := strings.TrimSpace(scanner.Text())
+	name := strings.TrimSpace(scanner.Text())
 
 	fmt.Print("Enter new description (or press Enter to skip): ")
 	if !scanner.Scan() {
@@ -306,33 +306,30 @@ func updateTask(api *tudidi.API, scanner *bufio.Scanner) {
 	}
 	description := strings.TrimSpace(scanner.Text())
 
-	fmt.Print("Mark as completed? (y/N): ")
-	if !scanner.Scan() {
-		return
-	}
-	completedStr := strings.TrimSpace(strings.ToLower(scanner.Text()))
-
-	var completed *bool
-	if completedStr == "y" || completedStr == "yes" {
-		val := true
-		completed = &val
-	} else if completedStr == "n" || completedStr == "no" {
-		val := false
-		completed = &val
-	}
+	// fmt.Print("Mark as completed? (y/N): ")
+	// if !scanner.Scan() {
+	// 	return
+	// }
+	// completedStr := strings.TrimSpace(strings.ToLower(scanner.Text()))
+	//
+	// switch completedStr {
+	// case "y", "yes":
+	// 	val := true
+	// 	completed = &val
+	// case "n", "no":
+	// 	val := false
+	// 	completed = &val
+	// }
 
 	req := tudidi.UpdateTaskRequest{}
-	if title != "" {
-		req.Title = title
+	if name != "" {
+		req.Name = name
 	}
 	if description != "" {
-		req.Description = description
-	}
-	if completed != nil {
-		req.Completed = completed
+		req.Note = description
 	}
 
-	if req.Title == "" && req.Description == "" && req.Completed == nil {
+	if req.Name == "" && req.Note == "" {
 		fmt.Println("❌ No updates specified")
 		return
 	}
@@ -347,6 +344,7 @@ func updateTask(api *tudidi.API, scanner *bufio.Scanner) {
 	fmt.Printf("✅ Task updated successfully!\n")
 	fmt.Printf("  ID:   %d\n", task.ID)
 	fmt.Printf("  Name: %s\n", task.Name)
+	fmt.Printf("  Completed: %t\n", task.CompletedAt != "")
 }
 
 func deleteTask(api *tudidi.API, scanner *bufio.Scanner) {

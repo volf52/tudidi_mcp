@@ -78,9 +78,8 @@ type CreateTaskRequest struct {
 }
 
 type UpdateTaskRequest struct {
-	Title       string `json:"title,omitempty"`
-	Description string `json:"description,omitempty"`
-	Completed   *bool  `json:"completed,omitempty"`
+	Name string `json:"name,omitempty"`
+	Note string `json:"note,omitempty"`
 }
 
 func NewAPI(client *auth.Client, readonly bool) *API {
@@ -119,7 +118,7 @@ func (api *API) GetTasks() ([]Task, error) {
 }
 
 func (api *API) GetTask(id int) (*Task, error) {
-	resp, err := api.client.Get("/api/tasks/" + strconv.Itoa(id))
+	resp, err := api.client.Get("/api/task/" + strconv.Itoa(id))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get task: %w", err)
 	}
@@ -155,7 +154,7 @@ func (api *API) CreateTask(req CreateTaskRequest) (*Task, error) {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	resp, err := api.client.Post("/api/tasks", "application/json", jsonData)
+	resp, err := api.client.Post("/api/task", "application/json", jsonData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create task: %w", err)
 	}
@@ -183,12 +182,24 @@ func (api *API) UpdateTask(id int, req UpdateTaskRequest) (*Task, error) {
 		return nil, fmt.Errorf("operation not allowed in readonly mode")
 	}
 
-	jsonData, err := json.Marshal(req)
+	if req.Name == "" && req.Note == "" {
+		return nil, fmt.Errorf("no fields to update")
+	}
+
+	currentTask, err := api.GetTask(id)
+	if err != nil {
+		return nil, fmt.Errorf("task with id %d not found: %w", id, err)
+	}
+
+	currentTask.Name = req.Name
+	currentTask.Note = req.Note
+
+	jsonData, err := json.Marshal(currentTask)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	resp, err := api.client.Put("/api/tasks/"+strconv.Itoa(id), "application/json", jsonData)
+	resp, err := api.client.Patch("/api/task/"+strconv.Itoa(id), "application/json", jsonData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update task: %w", err)
 	}
@@ -200,7 +211,6 @@ func (api *API) UpdateTask(id int, req UpdateTaskRequest) (*Task, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to update task: status %d", resp.StatusCode)
 	}
-
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %w", err)
@@ -219,7 +229,7 @@ func (api *API) DeleteTask(id int) error {
 		return fmt.Errorf("operation not allowed in readonly mode")
 	}
 
-	resp, err := api.client.Delete("/api/tasks/" + strconv.Itoa(id))
+	resp, err := api.client.Delete("/api/task/" + strconv.Itoa(id))
 	if err != nil {
 		return fmt.Errorf("failed to delete task: %w", err)
 	}

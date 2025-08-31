@@ -77,6 +77,16 @@ func (c *Client) Put(endpoint string, contentType string, body []byte) (*http.Re
 	return c.httpClient.Do(req)
 }
 
+func (c *Client) Patch(endpoint string, contentType string, body []byte) (*http.Response, error) {
+	fullURL := c.baseURL + endpoint
+	req, err := http.NewRequest(http.MethodPatch, fullURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", contentType)
+	return c.httpClient.Do(req)
+}
+
 func (c *Client) Delete(endpoint string) (*http.Response, error) {
 	fullURL := c.baseURL + endpoint
 	req, err := http.NewRequest(http.MethodDelete, fullURL, nil)
