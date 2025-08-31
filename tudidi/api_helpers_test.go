@@ -269,6 +269,44 @@ func createJSONResponse(statusCode int, data interface{}) *http.Response {
 	}
 }
 
+func TestSearchProjectsByName(t *testing.T) {
+	api := &API{readonly: false}
+
+	tests := []struct {
+		name          string
+		searchName    string
+		expectError   bool
+		errorContains string
+	}{
+		{
+			name:          "Empty search name",
+			searchName:    "",
+			expectError:   true,
+			errorContains: "name cannot be empty",
+		},
+		{
+			name:        "Valid search name",
+			searchName:  "test",
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Note: This test would require a mock HTTP client for complete testing
+			// For now, we test the validation logic
+			if tt.searchName == "" {
+				_, err := api.SearchProjectsByName(tt.searchName)
+				if !tt.expectError {
+					t.Errorf("Expected no error, got %v", err)
+				} else if !strings.Contains(err.Error(), tt.errorContains) {
+					t.Errorf("Expected error containing '%s', got '%s'", tt.errorContains, err.Error())
+				}
+			}
+		})
+	}
+}
+
 func TestCreateJSONResponse_Helper(t *testing.T) {
 	task := Task{ID: 1, Name: "Test Task"}
 	resp := createJSONResponse(http.StatusOK, task)

@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"tudidi_mcp/auth"
 )
 
@@ -250,4 +251,26 @@ func (api *API) GetProjects() ([]Project, error) {
 		return nil, fmt.Errorf("failed to get projects: %w", err)
 	}
 	return resp.Projects, nil
+}
+
+func (api *API) SearchProjectsByName(name string) ([]Project, error) {
+	if name == "" {
+		return nil, fmt.Errorf("name cannot be empty")
+	}
+
+	var resp GetProjectsResponse
+	if err := api.doGet("/api/projects", &resp); err != nil {
+		return nil, fmt.Errorf("failed to get projects: %w", err)
+	}
+
+	var filtered []Project
+	searchLower := strings.ToLower(name)
+
+	for _, project := range resp.Projects {
+		if strings.Contains(strings.ToLower(project.Name), searchLower) {
+			filtered = append(filtered, project)
+		}
+	}
+
+	return filtered, nil
 }
