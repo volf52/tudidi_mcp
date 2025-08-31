@@ -117,9 +117,8 @@ func (h *Handlers) createTask(ctx context.Context, req *mcp.CallToolRequest, arg
 
 func (h *Handlers) updateTask(ctx context.Context, req *mcp.CallToolRequest, args UpdateTaskArgs) (*mcp.CallToolResult, any, error) {
 	updateReq := tudidi.UpdateTaskRequest{
-		Title:       args.Title,
-		Description: args.Description,
-		Completed:   args.Completed,
+		Name: args.Title,
+		Note: args.Description,
 	}
 
 	task, err := h.api.UpdateTask(args.ID, updateReq)
@@ -153,7 +152,7 @@ func (h *Handlers) deleteTask(ctx context.Context, req *mcp.CallToolRequest, arg
 }
 
 func (h *Handlers) listTaskLists(ctx context.Context, req *mcp.CallToolRequest, args any) (*mcp.CallToolResult, any, error) {
-	lists, err := h.api.GetLists()
+	lists, err := h.api.GetProjects()
 	if err != nil {
 		return nil, nil, err
 	}

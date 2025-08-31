@@ -93,95 +93,125 @@ type GetTasksResponse struct {
 	Tasks []Task `json:"tasks"`
 }
 
-func (api *API) GetTasks() ([]Task, error) {
-	resp, err := api.client.Get("/api/tasks")
+func (api *API) doGet(endpoint string, result interface{}) error {
+	resp, err := api.client.Get(endpoint)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get tasks: %w", err)
+		return fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to get tasks: status %d", resp.StatusCode)
+	return api.handleResponse(resp, result, http.StatusOK)
+}
+
+func (api *API) doPost(endpoint string, payload interface{}, result interface{}) error {
+	return api.doMutatingRequest("POST", endpoint, payload, result, http.StatusCreated)
+}
+
+func (api *API) doPatch(endpoint string, payload interface{}, result interface{}) error {
+	return api.doMutatingRequest("PATCH", endpoint, payload, result, http.StatusOK)
+}
+
+func (api *API) doDelete(endpoint string) error {
+	if api.readonly {
+		return fmt.Errorf("operation not allowed in readonly mode")
+	}
+
+	resp, err := api.client.Delete(endpoint)
+	if err != nil {
+		return fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	return api.handleResponse(resp, nil, http.StatusOK, http.StatusNoContent)
+}
+
+func (api *API) doMutatingRequest(method, endpoint string, payload interface{}, result interface{}, expectedStatus int) error {
+	if api.readonly {
+		return fmt.Errorf("operation not allowed in readonly mode")
+	}
+
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	var resp *http.Response
+	switch method {
+	case "POST":
+		resp, err = api.client.Post(endpoint, "application/json", jsonData)
+	case "PATCH":
+		resp, err = api.client.Patch(endpoint, "application/json", jsonData)
+	default:
+		return fmt.Errorf("unsupported method: %s", method)
+	}
+
+	if err != nil {
+		return fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	return api.handleResponse(resp, result, expectedStatus)
+}
+
+func (api *API) handleResponse(resp *http.Response, result interface{}, expectedStatuses ...int) error {
+	statusOK := false
+	for _, status := range expectedStatuses {
+		if resp.StatusCode == status {
+			statusOK = true
+			break
+		}
+	}
+
+	if resp.StatusCode == http.StatusNotFound {
+		return fmt.Errorf("resource not found")
+	}
+
+	if !statusOK {
+		return fmt.Errorf("unexpected status: %d", resp.StatusCode)
+	}
+
+	if result == nil {
+		return nil
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
+		return fmt.Errorf("failed to read response: %w", err)
 	}
 
-	var respData GetTasksResponse
-	if err := json.Unmarshal(body, &respData); err != nil {
-		return nil, fmt.Errorf("failed to parse tasks: %w", err)
+	if err := json.Unmarshal(body, result); err != nil {
+		return fmt.Errorf("failed to parse response: %w", err)
 	}
 
-	return respData.Tasks, nil
+	return nil
+}
+
+func (api *API) GetTasks() ([]Task, error) {
+	var resp GetTasksResponse
+	if err := api.doGet("/api/tasks", &resp); err != nil {
+		return nil, fmt.Errorf("failed to get tasks: %w", err)
+	}
+	return resp.Tasks, nil
 }
 
 func (api *API) GetTask(id int) (*Task, error) {
-	resp, err := api.client.Get("/api/task/" + strconv.Itoa(id))
-	if err != nil {
+	var task Task
+	endpoint := "/api/task/" + strconv.Itoa(id)
+	if err := api.doGet(endpoint, &task); err != nil {
 		return nil, fmt.Errorf("failed to get task: %w", err)
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, fmt.Errorf("task not found")
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to get task: status %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
-	}
-
-	var task Task
-	if err := json.Unmarshal(body, &task); err != nil {
-		return nil, fmt.Errorf("failed to parse task: %w", err)
-	}
-
 	return &task, nil
 }
 
 func (api *API) CreateTask(req CreateTaskRequest) (*Task, error) {
-	if api.readonly {
-		return nil, fmt.Errorf("operation not allowed in readonly mode")
-	}
-
-	jsonData, err := json.Marshal(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
-	}
-
-	resp, err := api.client.Post("/api/task", "application/json", jsonData)
-	if err != nil {
+	var task Task
+	if err := api.doPost("/api/task", req, &task); err != nil {
 		return nil, fmt.Errorf("failed to create task: %w", err)
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusCreated {
-		return nil, fmt.Errorf("failed to create task: status %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
-	}
-
-	var task Task
-	if err := json.Unmarshal(body, &task); err != nil {
-		return nil, fmt.Errorf("failed to parse task: %w", err)
-	}
-
 	return &task, nil
 }
 
 func (api *API) UpdateTask(id int, req UpdateTaskRequest) (*Task, error) {
-	if api.readonly {
-		return nil, fmt.Errorf("operation not allowed in readonly mode")
-	}
-
 	if req.Name == "" && req.Note == "" {
 		return nil, fmt.Errorf("no fields to update")
 	}
@@ -194,54 +224,19 @@ func (api *API) UpdateTask(id int, req UpdateTaskRequest) (*Task, error) {
 	currentTask.Name = req.Name
 	currentTask.Note = req.Note
 
-	jsonData, err := json.Marshal(currentTask)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
-	}
-
-	resp, err := api.client.Patch("/api/task/"+strconv.Itoa(id), "application/json", jsonData)
-	if err != nil {
+	var updatedTask Task
+	endpoint := "/api/task/" + strconv.Itoa(id)
+	if err := api.doPatch(endpoint, currentTask, &updatedTask); err != nil {
 		return nil, fmt.Errorf("failed to update task: %w", err)
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, fmt.Errorf("task not found")
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to update task: status %d", resp.StatusCode)
-	}
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
-	}
-
-	var task Task
-	if err := json.Unmarshal(body, &task); err != nil {
-		return nil, fmt.Errorf("failed to parse task: %w", err)
-	}
-
-	return &task, nil
+	return &updatedTask, nil
 }
 
 func (api *API) DeleteTask(id int) error {
-	if api.readonly {
-		return fmt.Errorf("operation not allowed in readonly mode")
-	}
-
-	resp, err := api.client.Delete("/api/task/" + strconv.Itoa(id))
-	if err != nil {
+	endpoint := "/api/task/" + strconv.Itoa(id)
+	if err := api.doDelete(endpoint); err != nil {
 		return fmt.Errorf("failed to delete task: %w", err)
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return fmt.Errorf("task not found")
-	}
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		return fmt.Errorf("failed to delete task: status %d", resp.StatusCode)
-	}
-
 	return nil
 }
 
@@ -250,25 +245,9 @@ type GetProjectsResponse struct {
 }
 
 func (api *API) GetProjects() ([]Project, error) {
-	resp, err := api.client.Get("/api/projects")
-	if err != nil {
+	var resp GetProjectsResponse
+	if err := api.doGet("/api/projects", &resp); err != nil {
 		return nil, fmt.Errorf("failed to get projects: %w", err)
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to get lists: status %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
-	}
-
-	var projectsResponse GetProjectsResponse
-	if err := json.Unmarshal(body, &projectsResponse); err != nil {
-		return nil, fmt.Errorf("failed to parse projects: %w", err)
-	}
-
-	return projectsResponse.Projects, nil
+	return resp.Projects, nil
 }

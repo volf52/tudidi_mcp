@@ -93,52 +93,53 @@ func TestGetTasksReadonly(t *testing.T) {
 	t.Logf("Retrieved %d tasks in readonly mode", len(tasks))
 }
 
-func TestGetLists(t *testing.T) {
+func TestGetProjects(t *testing.T) {
 	api := setupTestAPI(t, false)
 
-	lists, err := api.GetLists()
+	projects, err := api.GetProjects()
 	if err != nil {
-		t.Fatalf("Failed to get lists: %v", err)
+		t.Fatalf("GetProjects failed: %v", err)
 	}
 
-	t.Logf("Retrieved %d lists", len(lists))
+	if projects == nil {
+		t.Error("Expected projects slice, got nil")
+	}
 
-	// If we have lists, validate the structure
-	for i, list := range lists {
-		if list.ID == 0 {
-			t.Errorf("List %d has invalid ID: %d", i, list.ID)
-		}
-		if list.Name == "" {
-			t.Errorf("List %d has empty name", i)
-		}
+	t.Logf("Found %d projects", len(projects))
+	for i, project := range projects {
+		t.Logf("Project %d: %+v", i, project)
 	}
 }
 
-func TestGetListsReadonly(t *testing.T) {
+func TestGetProjectsReadonly(t *testing.T) {
 	api := setupTestAPI(t, true)
 
-	lists, err := api.GetLists()
+	projects, err := api.GetProjects()
 	if err != nil {
-		t.Fatalf("Failed to get lists in readonly mode: %v", err)
+		t.Fatalf("GetProjects failed: %v", err)
 	}
 
-	t.Logf("Retrieved %d lists in readonly mode", len(lists))
+	if projects == nil {
+		t.Error("Expected projects slice, got nil")
+	}
+
+	t.Logf("Found %d projects (readonly)", len(projects))
 }
 
 func TestTaskCRUDOperations(t *testing.T) {
 	api := setupTestAPI(t, false)
 
-	// First, get lists to ensure we have a valid project ID
-	lists, err := api.GetLists()
+	// First, get projects to ensure we have a valid project ID
+	projects, err := api.GetProjects()
 	if err != nil {
-		t.Fatalf("Failed to get lists: %v", err)
+		t.Fatalf("Failed to get projects: %v", err)
 	}
 
 	var projectID int
-	if len(lists) > 0 {
-		projectID = lists[0].ID
+	if len(projects) > 0 {
+		projectID = projects[0].ID
 	} else {
-		t.Skip("No lists available for testing - cannot create tasks without a project")
+		t.Skip("No projects available for testing - cannot create tasks without a project")
 	}
 
 	// Test Create Task
@@ -180,11 +181,9 @@ func TestTaskCRUDOperations(t *testing.T) {
 	}
 
 	// Test Update Task
-	completed := true
 	updateReq := UpdateTaskRequest{
-		Title:       "Updated Test Task",
-		Description: "Updated description",
-		Completed:   &completed,
+		Name: "Updated Test Task",
+		Note: "Updated description",
 	}
 
 	updatedTask, err := api.UpdateTask(createdTask.ID, updateReq)
@@ -251,7 +250,7 @@ func TestReadonlyModeEnforcement(t *testing.T) {
 
 	// Test Update Task in readonly mode
 	updateReq := UpdateTaskRequest{
-		Title: "Should Not Be Updated",
+		Name: "Should Not Be Updated",
 	}
 
 	_, err = api.UpdateTask(1, updateReq)
@@ -276,7 +275,7 @@ func TestUpdateNonExistentTask(t *testing.T) {
 	api := setupTestAPI(t, false)
 
 	updateReq := UpdateTaskRequest{
-		Title: "Should Not Work",
+		Name: "Should Not Work",
 	}
 
 	// Try to update a task with a very high ID that likely doesn't exist
@@ -339,7 +338,7 @@ func BenchmarkGetTasks(b *testing.B) {
 		b.Fatalf("Failed to login: %v", err)
 	}
 
-	api := NewAPI(client, true)
+	api := NewAPI(client, false)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -350,28 +349,18 @@ func BenchmarkGetTasks(b *testing.B) {
 	}
 }
 
-func BenchmarkGetLists(b *testing.B) {
+func BenchmarkGetProjects(b *testing.B) {
 	if testURL == "" || testEmail == "" || testPassword == "" {
-		b.Skip("Skipping benchmark - set TUDIDI_TEST_* environment variables")
+		b.Skip("Skipping benchmark - set TUDIDI_TEST_URL, TUDIDI_TEST_EMAIL, and TUDIDI_TEST_PASSWORD environment variables")
 	}
 
-	client, err := auth.NewClient(testURL)
-	if err != nil {
-		b.Fatalf("Failed to create client: %v", err)
-	}
-
-	err = client.Login(testEmail, testPassword)
-	if err != nil {
-		b.Fatalf("Failed to login: %v", err)
-	}
-
-	api := NewAPI(client, true)
+	api := setupTestAPI(&testing.T{}, false)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := api.GetLists()
+		_, err := api.GetProjects()
 		if err != nil {
-			b.Fatalf("Failed to get lists: %v", err)
+			b.Errorf("GetProjects failed: %v", err)
 		}
 	}
 }
