@@ -3,7 +3,6 @@ package tudidi
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -175,12 +174,8 @@ func (api *API) handleResponse(resp *http.Response, result interface{}, expected
 		return nil
 	}
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("failed to read response: %w", err)
-	}
-
-	if err := json.Unmarshal(body, result); err != nil {
+	decoder := json.NewDecoder(resp.Body)
+	if err := decoder.Decode(result); err != nil {
 		return fmt.Errorf("failed to parse response: %w", err)
 	}
 

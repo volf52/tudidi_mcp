@@ -46,6 +46,11 @@ func (h *Handlers) RegisterTools(server *mcp.Server) {
 		Name:        "list_projects",
 		Description: "List all projects for the user",
 	}, h.listProjects)
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "Search projects by name",
+		Description: "Search for projects by their name",
+	}, h.searchProjectsByName)
 }
 
 type TaskIDArgs struct {
@@ -83,7 +88,7 @@ func (h *Handlers) listTasks(ctx context.Context, req *mcp.CallToolRequest, args
 
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
-			&mcp.TextContent{Text: fmt.Sprintf("Found %d tasks", len(tasks))},
+			&mcp.TextContent{Text: FormatTasksText(tasks)},
 		},
 	}, &result, nil
 }
@@ -172,9 +177,11 @@ func (h *Handlers) listProjects(ctx context.Context, req *mcp.CallToolRequest, a
 		Count:    len(projects),
 	}
 
+	prefix := fmt.Sprintf("Found %d projects", len(projects))
+
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
-			&mcp.TextContent{Text: fmt.Sprintf("Found %d projects", len(projects))},
+			&mcp.TextContent{Text: FormatProjectsText(projects, prefix)},
 		},
 	}, &result, nil
 }
@@ -194,10 +201,11 @@ func (h *Handlers) searchProjectsByName(ctx context.Context, req *mcp.CallToolRe
 		Count:    len(projects),
 	}
 
-	content := []mcp.Content{
-		&mcp.TextContent{Text: fmt.Sprintf("Found %d projects matching '%s'", len(projects), args.Name)},
-	}
-	callResult := mcp.CallToolResult{Content: content}
+	prefix := fmt.Sprintf("Found %d projects matching '%s'", len(projects), args.Name)
 
-	return &callResult, &result, nil
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			&mcp.TextContent{Text: FormatProjectsText(projects, prefix)},
+		},
+	}, &result, nil
 }
