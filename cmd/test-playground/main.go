@@ -13,43 +13,99 @@ import (
 	"tudidi_mcp/tudidi"
 )
 
+// Command represents a playground command
+type Command struct {
+	Name        string
+	Alias       string
+	Description string
+	Handler     func(*PlaygroundContext, *bufio.Scanner)
+	RequiresAPI bool
+}
+
+// PlaygroundContext holds the shared state
+type PlaygroundContext struct {
+	API    *tudidi.API
+	Config *config.Config
+	Client *auth.Client
+}
+
+// Commands defines all available playground commands
+var Commands = []Command{
+	{"help", "h", "Show detailed help", cmdShowHelp, false},
+	{"quit", "q", "Exit playground", cmdQuit, false},
+	{"status", "s", "Show current status", cmdShowStatus, false},
+	{"clear", "c", "Clear screen", cmdClearScreen, false},
+	{"toggle-readonly", "tr", "Toggle readonly mode", cmdToggleReadonly, false},
+	{"list-tasks", "lt", "List all tasks", cmdListTasks, true},
+	{"get-task", "gt", "Get specific task by ID", cmdGetTask, true},
+	{"create-task", "ct", "Create a new task", cmdCreateTask, true},
+	{"update-task", "ut", "Update existing task", cmdUpdateTask, true},
+	{"delete-task", "dt", "Delete a task", cmdDeleteTask, true},
+	{"list-projects", "lp", "List all projects", cmdListProjects, true},
+	{"search-projects", "sp", "Search projects by name", cmdSearchProjects, true},
+}
+
 func main() {
 	fmt.Println("🔧 Tudidi API Testing Playground")
 	fmt.Println("==================================")
 
-	// Parse config
+	cfg, err := initializeConfig()
+	if err != nil {
+		os.Exit(1)
+	}
+
+	client, err := initializeClient(cfg)
+	if err != nil {
+		log.Fatalf("❌ Client initialization failed: %v", err)
+	}
+
+	api := tudidi.NewAPI(client, cfg.Readonly)
+	ctx := &PlaygroundContext{
+		API:    api,
+		Config: cfg,
+		Client: client,
+	}
+
+	showStartupMessage(cfg)
+	runInteractiveLoop(ctx)
+}
+
+func initializeConfig() (*config.Config, error) {
 	cfg, err := config.ParseArgs()
 	if err != nil {
 		fmt.Printf("❌ Configuration error: %v\n", err)
 		fmt.Println("\nUsage examples:")
 		fmt.Println("  ./test-playground --url http://localhost:3002 --email admin@test.com --password secret")
 		fmt.Println("  TUDIDI_URL=http://localhost:3002 TUDIDI_USER_EMAIL=admin@test.com TUDIDI_USER_PASSWORD=secret ./test-playground")
-		os.Exit(1)
+		return nil, err
 	}
+	return cfg, nil
+}
 
-	// Create HTTP client with authentication
+func initializeClient(cfg *config.Config) (*auth.Client, error) {
 	client, err := auth.NewClient(cfg.URL)
 	if err != nil {
-		log.Fatalf("❌ Failed to create HTTP client: %v", err)
+		return nil, fmt.Errorf("failed to create HTTP client: %w", err)
 	}
 
-	// Authenticate with Tudidi server
 	fmt.Printf("🔐 Authenticating with %s...\n", cfg.URL)
 	if err := client.Login(cfg.Email, cfg.Password); err != nil {
-		log.Fatalf("❌ Authentication failed: %v", err)
+		return nil, fmt.Errorf("authentication failed: %w", err)
 	}
+
 	fmt.Println("✅ Authentication successful!")
+	return client, nil
+}
 
-	// Create API instance
-	api := tudidi.NewAPI(client, cfg.Readonly)
-
+func showStartupMessage(cfg *config.Config) {
 	readonlyStatus := ""
 	if cfg.Readonly {
 		readonlyStatus = " (READONLY MODE - destructive operations disabled)"
 	}
 	fmt.Printf("🚀 API ready%s\n\n", readonlyStatus)
+}
 
-	// Interactive mode
+func runInteractiveLoop(ctx *PlaygroundContext) {
 	scanner := bufio.NewScanner(os.Stdin)
 
 	for {
@@ -65,56 +121,38 @@ func main() {
 			continue
 		}
 
-		switch command {
-		case "help", "h":
-			showHelp()
-		case "quit", "q", "exit":
-			fmt.Println("👋 Goodbye!")
-			return
-		case "list-tasks", "lt":
-			listTasks(api)
-		case "get-task", "gt":
-			getTask(api, scanner)
-		case "create-task", "ct":
-			createTask(api, scanner)
-		case "update-task", "ut":
-			updateTask(api, scanner)
-		case "delete-task", "dt":
-			deleteTask(api, scanner)
-		case "list-lists", "ll":
-			listLists(api)
-		case "toggle-readonly", "tr":
-			api = toggleReadonly(api, client, !cfg.Readonly)
-			cfg.Readonly = !cfg.Readonly
-		case "status", "s":
-			showStatus(cfg, api)
-		case "clear", "c":
-			clearScreen()
-		default:
-			fmt.Printf("❌ Unknown command: %s\n", command)
-			fmt.Println("Type 'help' for available commands")
-		}
-
+		handleCommand(ctx, command, scanner)
 		fmt.Println()
 	}
 }
 
-func showMenu() {
-	fmt.Println("📋 Available Commands:")
-	fmt.Println("  list-tasks (lt)     - List all tasks")
-	fmt.Println("  get-task (gt)       - Get specific task by ID")
-	fmt.Println("  create-task (ct)    - Create a new task")
-	fmt.Println("  update-task (ut)    - Update existing task")
-	fmt.Println("  delete-task (dt)    - Delete a task")
-	fmt.Println("  list-lists (ll)     - List all project lists")
-	fmt.Println("  toggle-readonly (tr)- Toggle readonly mode")
-	fmt.Println("  status (s)          - Show current status")
-	fmt.Println("  clear (c)           - Clear screen")
-	fmt.Println("  help (h)            - Show detailed help")
-	fmt.Println("  quit (q)            - Exit")
+func handleCommand(ctx *PlaygroundContext, input string, scanner *bufio.Scanner) {
+	// Find matching command
+	for _, cmd := range Commands {
+		if input == cmd.Name || input == cmd.Alias {
+			if cmd.RequiresAPI && ctx.API == nil {
+				fmt.Println("❌ API not available")
+				return
+			}
+			cmd.Handler(ctx, scanner)
+			return
+		}
+	}
+
+	fmt.Printf("❌ Unknown command: %s\n", input)
+	fmt.Println("Type 'help' for available commands")
 }
 
-func showHelp() {
+func showMenu() {
+	fmt.Println("📋 Available Commands:")
+	for _, cmd := range Commands {
+		fmt.Printf("  %-20s (%s) - %s\n", cmd.Name, cmd.Alias, cmd.Description)
+	}
+}
+
+// Command Handlers
+
+func cmdShowHelp(ctx *PlaygroundContext, scanner *bufio.Scanner) {
 	fmt.Println("🆘 Detailed Command Help:")
 	fmt.Println("========================")
 	fmt.Println()
@@ -128,8 +166,12 @@ func showHelp() {
 	fmt.Println("    Will prompt for task ID")
 	fmt.Println("    Safe to use in readonly mode")
 	fmt.Println()
-	fmt.Println("  list-lists, ll")
+	fmt.Println("  list-projects, lp")
 	fmt.Println("    Lists all project lists/containers")
+	fmt.Println("    Safe to use in readonly mode")
+	fmt.Println()
+	fmt.Println("  search-projects, sp")
+	fmt.Println("    Search projects by name (case-insensitive)")
 	fmt.Println("    Safe to use in readonly mode")
 	fmt.Println()
 	fmt.Println("✍️  WRITE OPERATIONS (disabled in readonly mode):")
@@ -156,9 +198,49 @@ func showHelp() {
 	fmt.Println("    Clears the screen")
 }
 
-func listTasks(api *tudidi.API) {
+func cmdQuit(ctx *PlaygroundContext, scanner *bufio.Scanner) {
+	fmt.Println("👋 Goodbye!")
+	os.Exit(0)
+}
+
+func cmdShowStatus(ctx *PlaygroundContext, scanner *bufio.Scanner) {
+	fmt.Println("📊 Current Status:")
+	fmt.Printf("  Server URL:  %s\n", ctx.Config.URL)
+	fmt.Printf("  Email:       %s\n", ctx.Config.Email)
+	fmt.Printf("  Transport:   %s", ctx.Config.Transport)
+	if ctx.Config.Transport == "sse" {
+		fmt.Printf(" (port %d)", ctx.Config.Port)
+	}
+	fmt.Println()
+
+	readonlyStatus := "WRITABLE (create/update/delete enabled)"
+	if ctx.Config.Readonly {
+		readonlyStatus = "READONLY (create/update/delete disabled)"
+	}
+	fmt.Printf("  Mode:        %s\n", readonlyStatus)
+	fmt.Printf("  Time:        %s\n", time.Now().Format("2006-01-02 15:04:05"))
+}
+
+func cmdClearScreen(ctx *PlaygroundContext, scanner *bufio.Scanner) {
+	fmt.Print("\033[2J\033[H")
+	fmt.Println("🔧 Tudidi API Testing Playground")
+	fmt.Println("==================================")
+}
+
+func cmdToggleReadonly(ctx *PlaygroundContext, scanner *bufio.Scanner) {
+	ctx.Config.Readonly = !ctx.Config.Readonly
+	ctx.API = tudidi.NewAPI(ctx.Client, ctx.Config.Readonly)
+
+	status := "WRITABLE"
+	if ctx.Config.Readonly {
+		status = "READONLY"
+	}
+	fmt.Printf("🔄 Switched to %s mode\n", status)
+}
+
+func cmdListTasks(ctx *PlaygroundContext, scanner *bufio.Scanner) {
 	fmt.Println("📋 Fetching tasks...")
-	tasks, err := api.GetTasks()
+	tasks, err := ctx.API.GetTasks()
 	if err != nil {
 		fmt.Printf("❌ Error fetching tasks: %v\n", err)
 		return
@@ -182,7 +264,7 @@ func listTasks(api *tudidi.API) {
 	}
 }
 
-func getTask(api *tudidi.API, scanner *bufio.Scanner) {
+func cmdGetTask(ctx *PlaygroundContext, scanner *bufio.Scanner) {
 	fmt.Print("Enter task ID: ")
 	if !scanner.Scan() {
 		return
@@ -196,7 +278,7 @@ func getTask(api *tudidi.API, scanner *bufio.Scanner) {
 	}
 
 	fmt.Printf("🔍 Fetching task %d...\n", id)
-	task, err := api.GetTask(id)
+	task, err := ctx.API.GetTask(id)
 	if err != nil {
 		fmt.Printf("❌ Error fetching task: %v\n", err)
 		return
@@ -219,7 +301,7 @@ func getTask(api *tudidi.API, scanner *bufio.Scanner) {
 	fmt.Printf("  Parent Task: %d\n", task.ParentTaskID)
 }
 
-func createTask(api *tudidi.API, scanner *bufio.Scanner) {
+func cmdCreateTask(ctx *PlaygroundContext, scanner *bufio.Scanner) {
 	fmt.Print("Enter task name: ")
 	if !scanner.Scan() {
 		return
@@ -252,13 +334,13 @@ func createTask(api *tudidi.API, scanner *bufio.Scanner) {
 		}
 	} else {
 		// Try to get first available project
-		lists, err := api.GetProjects()
-		if err != nil || len(lists) == 0 {
+		projects, err := ctx.API.GetProjects()
+		if err != nil || len(projects) == 0 {
 			fmt.Println("❌ No projects available and no project ID specified")
 			return
 		}
-		projectID = lists[0].ID
-		fmt.Printf("ℹ️  Using project ID %d (%s)\n", projectID, lists[0].Name)
+		projectID = projects[0].ID
+		fmt.Printf("ℹ️  Using project ID %d (%s)\n", projectID, projects[0].Name)
 	}
 
 	req := tudidi.CreateTaskRequest{
@@ -269,7 +351,7 @@ func createTask(api *tudidi.API, scanner *bufio.Scanner) {
 	}
 
 	fmt.Println("🔨 Creating task...")
-	task, err := api.CreateTask(req)
+	task, err := ctx.API.CreateTask(req)
 	if err != nil {
 		fmt.Printf("❌ Error creating task: %v\n", err)
 		return
@@ -281,7 +363,7 @@ func createTask(api *tudidi.API, scanner *bufio.Scanner) {
 	fmt.Printf("  Note: %s\n", task.Note)
 }
 
-func updateTask(api *tudidi.API, scanner *bufio.Scanner) {
+func cmdUpdateTask(ctx *PlaygroundContext, scanner *bufio.Scanner) {
 	fmt.Print("Enter task ID to update: ")
 	if !scanner.Scan() {
 		return
@@ -306,21 +388,6 @@ func updateTask(api *tudidi.API, scanner *bufio.Scanner) {
 	}
 	description := strings.TrimSpace(scanner.Text())
 
-	// fmt.Print("Mark as completed? (y/N): ")
-	// if !scanner.Scan() {
-	// 	return
-	// }
-	// completedStr := strings.TrimSpace(strings.ToLower(scanner.Text()))
-	//
-	// switch completedStr {
-	// case "y", "yes":
-	// 	val := true
-	// 	completed = &val
-	// case "n", "no":
-	// 	val := false
-	// 	completed = &val
-	// }
-
 	req := tudidi.UpdateTaskRequest{}
 	if name != "" {
 		req.Name = name
@@ -335,7 +402,7 @@ func updateTask(api *tudidi.API, scanner *bufio.Scanner) {
 	}
 
 	fmt.Printf("🔄 Updating task %d...\n", id)
-	task, err := api.UpdateTask(id, req)
+	task, err := ctx.API.UpdateTask(id, req)
 	if err != nil {
 		fmt.Printf("❌ Error updating task: %v\n", err)
 		return
@@ -344,10 +411,10 @@ func updateTask(api *tudidi.API, scanner *bufio.Scanner) {
 	fmt.Printf("✅ Task updated successfully!\n")
 	fmt.Printf("  ID:   %d\n", task.ID)
 	fmt.Printf("  Name: %s\n", task.Name)
-	fmt.Printf("  Completed: %t\n", task.CompletedAt != "")
+	fmt.Printf("  Note: %s\n", task.Note)
 }
 
-func deleteTask(api *tudidi.API, scanner *bufio.Scanner) {
+func cmdDeleteTask(ctx *PlaygroundContext, scanner *bufio.Scanner) {
 	fmt.Print("Enter task ID to delete: ")
 	if !scanner.Scan() {
 		return
@@ -361,7 +428,7 @@ func deleteTask(api *tudidi.API, scanner *bufio.Scanner) {
 	}
 
 	// Get task details first
-	task, err := api.GetTask(id)
+	task, err := ctx.API.GetTask(id)
 	if err != nil {
 		fmt.Printf("❌ Error fetching task: %v\n", err)
 		return
@@ -383,7 +450,7 @@ func deleteTask(api *tudidi.API, scanner *bufio.Scanner) {
 	}
 
 	fmt.Printf("🗑️  Deleting task %d...\n", id)
-	err = api.DeleteTask(id)
+	err = ctx.API.DeleteTask(id)
 	if err != nil {
 		fmt.Printf("❌ Error deleting task: %v\n", err)
 		return
@@ -392,70 +459,61 @@ func deleteTask(api *tudidi.API, scanner *bufio.Scanner) {
 	fmt.Println("✅ Task deleted successfully!")
 }
 
-func listLists(api *tudidi.API) {
+func cmdListProjects(ctx *PlaygroundContext, scanner *bufio.Scanner) {
 	fmt.Println("📁 Fetching project lists...")
-	lists, err := api.GetProjects()
+	projects, err := ctx.API.GetProjects()
 	if err != nil {
-		fmt.Printf("❌ Error fetching lists: %v\n", err)
+		fmt.Printf("❌ Error fetching projects: %v\n", err)
 		return
 	}
 
-	if len(lists) == 0 {
-		fmt.Println("📝 No project lists found")
+	displayProjects(projects)
+}
+
+func cmdSearchProjects(ctx *PlaygroundContext, scanner *bufio.Scanner) {
+	fmt.Print("Enter project name to search for: ")
+	if !scanner.Scan() {
+		return
+	}
+	name := strings.TrimSpace(scanner.Text())
+	if name == "" {
+		fmt.Println("❌ Project name cannot be empty")
 		return
 	}
 
-	fmt.Printf("✅ Found %d project lists:\n", len(lists))
+	fmt.Printf("🔍 Searching projects by name: %s...\n", name)
+	projects, err := ctx.API.SearchProjectsByName(name)
+	if err != nil {
+		fmt.Printf("❌ Error searching projects: %v\n", err)
+		return
+	}
+
+	displayProjects(projects)
+}
+
+// Helper Functions
+
+func displayProjects(projects []tudidi.Project) {
+	if len(projects) == 0 {
+		fmt.Println("📝 No projects found")
+		return
+	}
+
+	fmt.Printf("✅ Found %d project(s):\n", len(projects))
 	fmt.Println("ID   | Name                     | Active | Description")
 	fmt.Println("-----|--------------------------|--------|------------")
 
-	for _, list := range lists {
+	for _, project := range projects {
 		active := "No"
-		if list.Active {
+		if project.Active {
 			active = "Yes"
 		}
-		name := truncateString(list.Name, 24)
-		desc := truncateString(list.Description, 20)
+		name := truncateString(project.Name, 24)
+		desc := truncateString(project.Description, 20)
 		fmt.Printf("%-4d | %-24s | %-6s | %s\n",
-			list.ID, name, active, desc)
+			project.ID, name, active, desc)
 	}
 }
-
-func toggleReadonly(api *tudidi.API, client *auth.Client, readonly bool) *tudidi.API {
-	newAPI := tudidi.NewAPI(client, readonly)
-	status := "WRITABLE"
-	if readonly {
-		status = "READONLY"
-	}
-	fmt.Printf("🔄 Switched to %s mode\n", status)
-	return newAPI
-}
-
-func showStatus(cfg *config.Config, api *tudidi.API) {
-	fmt.Println("📊 Current Status:")
-	fmt.Printf("  Server URL:  %s\n", cfg.URL)
-	fmt.Printf("  Email:       %s\n", cfg.Email)
-	fmt.Printf("  Transport:   %s", cfg.Transport)
-	if cfg.Transport == "sse" {
-		fmt.Printf(" (port %d)", cfg.Port)
-	}
-	fmt.Println()
-
-	readonlyStatus := "WRITABLE (create/update/delete enabled)"
-	if cfg.Readonly {
-		readonlyStatus = "READONLY (create/update/delete disabled)"
-	}
-	fmt.Printf("  Mode:        %s\n", readonlyStatus)
-	fmt.Printf("  Time:        %s\n", time.Now().Format("2006-01-02 15:04:05"))
-}
-
-func clearScreen() {
-	fmt.Print("\033[2J\033[H")
-	fmt.Println("🔧 Tudidi API Testing Playground")
-	fmt.Println("==================================")
-}
-
-// Helper functions
 
 func getStatusText(status int) string {
 	switch status {
