@@ -43,9 +43,9 @@ func (h *Handlers) RegisterTools(server *mcp.Server) {
 	}, h.deleteTask)
 
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "list_task_lists",
-		Description: "List all task lists",
-	}, h.listTaskLists)
+		Name:        "list_projects",
+		Description: "List all projects for the user",
+	}, h.listProjects)
 }
 
 type TaskIDArgs struct {
@@ -65,25 +65,30 @@ type UpdateTaskArgs struct {
 	Completed   *bool  `json:"completed,omitempty" jsonschema:"Task completion status"`
 }
 
-func (h *Handlers) listTasks(ctx context.Context, req *mcp.CallToolRequest, args any) (*mcp.CallToolResult, any, error) {
+type TasksResult struct {
+	Tasks []tudidi.Task `json:"task" jsonschema:"List of tasks"`
+	Count int           `json:"count" jsonschema:"Number of tasks"`
+}
+
+func (h *Handlers) listTasks(ctx context.Context, req *mcp.CallToolRequest, args any) (*mcp.CallToolResult, *TasksResult, error) {
 	tasks, err := h.api.GetTasks()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	result := map[string]interface{}{
-		"tasks": tasks,
-		"count": len(tasks),
+	result := TasksResult{
+		Tasks: tasks,
+		Count: len(tasks),
 	}
 
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
 			&mcp.TextContent{Text: fmt.Sprintf("Found %d tasks", len(tasks))},
 		},
-	}, result, nil
+	}, &result, nil
 }
 
-func (h *Handlers) getTask(ctx context.Context, req *mcp.CallToolRequest, args TaskIDArgs) (*mcp.CallToolResult, any, error) {
+func (h *Handlers) getTask(ctx context.Context, req *mcp.CallToolRequest, args TaskIDArgs) (*mcp.CallToolResult, *tudidi.Task, error) {
 	task, err := h.api.GetTask(args.ID)
 	if err != nil {
 		return nil, nil, err
@@ -96,7 +101,7 @@ func (h *Handlers) getTask(ctx context.Context, req *mcp.CallToolRequest, args T
 	}, task, nil
 }
 
-func (h *Handlers) createTask(ctx context.Context, req *mcp.CallToolRequest, args CreateTaskArgs) (*mcp.CallToolResult, any, error) {
+func (h *Handlers) createTask(ctx context.Context, req *mcp.CallToolRequest, args CreateTaskArgs) (*mcp.CallToolResult, *tudidi.Task, error) {
 	createReq := tudidi.CreateTaskRequest{
 		Name:      args.Title,
 		Note:      args.Description,
@@ -115,7 +120,7 @@ func (h *Handlers) createTask(ctx context.Context, req *mcp.CallToolRequest, arg
 	}, task, nil
 }
 
-func (h *Handlers) updateTask(ctx context.Context, req *mcp.CallToolRequest, args UpdateTaskArgs) (*mcp.CallToolResult, any, error) {
+func (h *Handlers) updateTask(ctx context.Context, req *mcp.CallToolRequest, args UpdateTaskArgs) (*mcp.CallToolResult, *tudidi.Task, error) {
 	updateReq := tudidi.UpdateTaskRequest{
 		Name: args.Title,
 		Note: args.Description,
@@ -151,20 +156,48 @@ func (h *Handlers) deleteTask(ctx context.Context, req *mcp.CallToolRequest, arg
 	}, result, nil
 }
 
-func (h *Handlers) listTaskLists(ctx context.Context, req *mcp.CallToolRequest, args any) (*mcp.CallToolResult, any, error) {
-	lists, err := h.api.GetProjects()
+type ProjectsResult struct {
+	Projects []tudidi.Project `json:"projects" jsonschema:"List of projects"`
+	Count    int              `json:"count" jsonschema:"Number of projects"`
+}
+
+func (h *Handlers) listProjects(ctx context.Context, req *mcp.CallToolRequest, args any) (*mcp.CallToolResult, *ProjectsResult, error) {
+	projects, err := h.api.GetProjects()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	result := map[string]interface{}{
-		"lists": lists,
-		"count": len(lists),
+	result := ProjectsResult{
+		Projects: projects,
+		Count:    len(projects),
 	}
 
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
-			&mcp.TextContent{Text: fmt.Sprintf("Found %d task lists", len(lists))},
+			&mcp.TextContent{Text: fmt.Sprintf("Found %d projects", len(projects))},
 		},
-	}, result, nil
+	}, &result, nil
+}
+
+type SearchProjectsByNameArgs struct {
+	Name string `json:"name" jsonschema:"Project name to search for"`
+}
+
+func (h *Handlers) searchProjectsByName(ctx context.Context, req *mcp.CallToolRequest, args SearchProjectsByNameArgs) (*mcp.CallToolResult, *ProjectsResult, error) {
+	projects, err := h.api.SearchProjectsByName(args.Name)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	result := ProjectsResult{
+		Projects: projects,
+		Count:    len(projects),
+	}
+
+	content := []mcp.Content{
+		&mcp.TextContent{Text: fmt.Sprintf("Found %d projects matching '%s'", len(projects), args.Name)},
+	}
+	callResult := mcp.CallToolResult{Content: content}
+
+	return &callResult, &result, nil
 }
